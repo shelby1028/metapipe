@@ -6,18 +6,32 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+import matplotlib.pyplot as plt
 import pandas as pd
 
 from metapipe.diagnostics import egger_test, leave_one_out
-from metapipe.effects import EffectSize, hedges_g, mean_difference
+from metapipe.effects import (
+    EffectSize,
+    hedges_g,
+    mean_difference,
+    odds_ratio,
+    risk_difference,
+    risk_ratio,
+)
 from metapipe.models import MetaAnalysisResult, TauMethod, fixed_effect, random_effects
 from metapipe.plots import forest_plot, funnel_plot
 from metapipe.subgroup import SubgroupAnalysisResult, subgroup_analysis
 
-EffectMeasure = Literal["hedges_g", "mean_difference"]
+EffectMeasure = Literal[
+    "hedges_g",
+    "mean_difference",
+    "odds_ratio",
+    "risk_ratio",
+    "risk_difference",
+]
 ModelType = Literal["fixed", "random"]
 
-_REQUIRED_COLUMNS = {
+_REQUIRED_CONTINUOUS_COLUMNS = {
     "study",
     "n_treatment",
     "mean_treatment",
@@ -26,6 +40,13 @@ _REQUIRED_COLUMNS = {
     "mean_control",
     "sd_control",
 }
+_REQUIRED_BINARY_COLUMNS = {
+    "study",
+    "n_treatment",
+    "events_treatment",
+    "n_control",
+    "events_control",
+}
 
 
 @dataclass(frozen=True)
@@ -33,7 +54,8 @@ class AnalysisConfig:
     """Configuration for a CSV-driven meta-analysis report.
 
     Attributes:
-        effect_measure: ``"hedges_g"`` or ``"mean_difference"``.
+        effect_measure: Continuous ``"hedges_g"``/``"mean_difference"`` or
+            binary ``"odds_ratio"``/``"risk_ratio"``/``"risk_difference"``.
         model_type: ``"fixed"`` or ``"random"`` pooling model.
         tau_method: Tau-squared estimator used by random-effects fits.
         subgroup_column: Optional categorical CSV column for subgroup analysis.
@@ -70,8 +92,14 @@ class ReportResult:
 
 def _validate_config(config: AnalysisConfig) -> None:
     """Validate report configuration before any analysis is run."""
-    if config.effect_measure not in {"hedges_g", "mean_difference"}:
-        raise ValueError("effect_measure must be 'hedges_g' or 'mean_difference'.")
+    if config.effect_measure not in {
+        "hedges_g",
+        "mean_difference",
+        "odds_ratio",
+        "risk_ratio",
+        "risk_difference",
+    }:
+        raise ValueError("effect_measure is not supported.")
     if config.model_type not in {"fixed", "random"}:
         raise ValueError("model_type must be either 'fixed' or 'random'.")
 
@@ -80,28 +108,77 @@ def _load_study_effects(
     data_path: str | Path,
     effect_measure: EffectMeasure,
 ) -> tuple[pd.DataFrame, list[EffectSize]]:
-    """Load continuous data from CSV and calculate one effect estimate per study."""
+    """Load a supported CSV layout and calculate one effect estimate per study."""
     path = Path(data_path)
     if path.suffix.lower() != ".csv":
         raise ValueError("Input data must be a CSV file.")
     dataframe = pd.read_csv(path)
-    missing_columns = sorted(_REQUIRED_COLUMNS - set(dataframe.columns))
+    continuous_measures = {"hedges_g", "mean_difference"}
+    required_columns = (
+        _REQUIRED_CONTINUOUS_COLUMNS
+        if effect_measure in continuous_measures
+        else _REQUIRED_BINARY_COLUMNS
+    )
+    missing_columns = sorted(required_columns - set(dataframe.columns))
     if missing_columns:
         raise ValueError(
             "CSV is missing required columns: " + ", ".join(missing_columns)
         )
-    calculator = hedges_g if effect_measure == "hedges_g" else mean_difference
-    effect_sizes = [
-        calculator(
-            row.mean_treatment,
-            row.sd_treatment,
-            int(row.n_treatment),
-            row.mean_control,
-            row.sd_control,
-            int(row.n_control),
-        )
-        for row in dataframe.itertuples(index=False)
-    ]
+
+    if effect_measure in continuous_measures:
+        calculator = hedges_g if effect_measure == "hedges_g" else mean_difference
+        effect_sizes = [
+            calculator(
+                row.mean_treatment,
+                row.sd_treatment,
+                int(row.n_treatment),
+                row.mean_control,
+                row.sd_control,
+                int(row.n_control),
+            )
+            for row in dataframe.itertuples(index=False)
+        ]
+        return dataframe, effect_sizes
+
+    effect_sizes = []
+    for row in dataframe.itertuples(index=False):
+        events_treatment = float(row.events_treatment)
+        events_control = float(row.events_control)
+        n_treatment = float(row.n_treatment)
+        n_control = float(row.n_control)
+        if (
+            events_treatment < 0
+            or events_control < 0
+            or events_treatment > n_treatment
+            or events_control > n_control
+        ):
+            raise ValueError("Binary event counts must be between zero and group size.")
+        non_events_treatment = n_treatment - events_treatment
+        non_events_control = n_control - events_control
+        if effect_measure == "odds_ratio":
+            result = odds_ratio(
+                events_treatment,
+                non_events_treatment,
+                events_control,
+                non_events_control,
+                log_scale=True,
+            )
+        elif effect_measure == "risk_ratio":
+            result = risk_ratio(
+                events_treatment,
+                non_events_treatment,
+                events_control,
+                non_events_control,
+                log_scale=True,
+            )
+        else:
+            result = risk_difference(
+                events_treatment,
+                non_events_treatment,
+                events_control,
+                non_events_control,
+            )
+        effect_sizes.append(result)
     return dataframe, effect_sizes
 
 
@@ -224,11 +301,14 @@ def generate_report(
     effect_values = [effect.effect for effect in effect_sizes]
     standard_errors = [effect.standard_error for effect in effect_sizes]
     study_labels = dataframe["study"].astype(str).tolist()
-    effect_label = (
-        "Hedges' g"
-        if analysis_config.effect_measure == "hedges_g"
-        else "Mean difference"
-    )
+    effect_labels = {
+        "hedges_g": "Hedges' g",
+        "mean_difference": "Mean difference",
+        "odds_ratio": "log(OR)",
+        "risk_ratio": "log(RR)",
+        "risk_difference": "Risk difference",
+    }
+    effect_label = effect_labels[analysis_config.effect_measure]
     forest_path = asset_directory / "forest_plot.png"
     forest_figure, _ = forest_plot(
         effect_values,
@@ -239,7 +319,7 @@ def generate_report(
         effect_label=effect_label,
         output_path=forest_path,
     )
-    forest_figure.clear()
+    plt.close(forest_figure)
     asset_paths: dict[str, Path] = {"forest_plot": forest_path}
 
     egger_p_value: float | None = None
@@ -255,7 +335,7 @@ def generate_report(
             effect_label=effect_label,
             output_path=funnel_path,
         )
-        funnel_figure.clear()
+        plt.close(funnel_figure)
         asset_paths["funnel_plot"] = funnel_path
 
     sensitivity_table: pd.DataFrame | None = None
@@ -268,7 +348,7 @@ def generate_report(
             output_path=sensitivity_path,
         )
         sensitivity_table = sensitivity_result.table
-        sensitivity_result.figure.clear()
+        plt.close(sensitivity_result.figure)
         asset_paths["leave_one_out"] = sensitivity_path
 
     subgroup_result: SubgroupAnalysisResult | None = None
@@ -296,9 +376,11 @@ def generate_report(
 
     if analysis_config.model_type == "fixed":
         method_name = "inverse-variance fixed-effect model"
+        model_article = "an"
     else:
         tau_method_name = analysis_config.tau_method.upper()
         method_name = f"random-effects model with {tau_method_name} tau² estimation"
+        model_article = "a"
     significance = (
         "statistically significant"
         if model_result.p_value < 0.05
@@ -308,16 +390,24 @@ def generate_report(
         name: path.relative_to(markdown_path.parent).as_posix()
         for name, path in asset_paths.items()
     }
+    if analysis_config.effect_measure in {"hedges_g", "mean_difference"}:
+        methods_description = (
+            f"Study-level {effect_label} estimates were calculated from group means, "
+            f"standard deviations, and sample sizes. Results were pooled using "
+            f"{model_article} {method_name}."
+        )
+    else:
+        methods_description = (
+            f"Study-level {effect_label} estimates were calculated from events and "
+            f"group sample sizes. Results were pooled using {model_article} "
+            f"{method_name}."
+        )
     lines = [
         "# Meta-analysis report",
         "",
         "## Methods",
         "",
-        (
-            f"Study-level {effect_label} estimates were calculated from group means, "
-            f"standard deviations, and sample sizes. Results were pooled using an "
-            f"{method_name}."
-        ),
+        methods_description,
         "",
         "## Results",
         "",

@@ -1,0 +1,11 @@
+study,year,events_treatment,n_treatment,events_control,n_control,study_type
+Exercise Prevention 01,2012,8,80,14,78,RCT
+Exercise Prevention 02,2013,10,95,18,92,RCT
+Exercise Prevention 03,2014,6,65,11,63,Quasi-experimental
+Exercise Prevention 04,2015,12,110,21,108,RCT
+Exercise Prevention 05,2016,7,72,13,70,RCT
+Exercise Prevention 06,2017,9,88,17,86,RCT
+Exercise Prevention 07,2018,5,60,10,59,Quasi-experimental
+Exercise Prevention 08,2019,11,102,20,100,RCT
+Exercise Prevention 09,2020,8,76,15,75,RCT
+Exercise Prevention 10,2021,6,69,12,68,Quasi-experimental

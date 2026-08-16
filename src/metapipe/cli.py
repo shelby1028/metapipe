@@ -53,6 +53,14 @@ _REPORT_OUTPUT_OPTION = typer.Option(
     "-o",
     help="Markdown destination for the generated report.",
 )
+_REPORT_EFFECT_MEASURE_OPTION = typer.Option(
+    "hedges_g",
+    "--effect-measure",
+    help=(
+        "Effect measure: hedges_g, mean_difference, odds_ratio, risk_ratio, "
+        "or risk_difference."
+    ),
+)
 
 
 def _load_continuous_effects(data_path: Path) -> tuple[pd.DataFrame, list[EffectSize]]:
@@ -136,8 +144,13 @@ def funnel(
 def report(
     data: Path = _DATA_ARGUMENT,
     output: Path = _REPORT_OUTPUT_OPTION,
+    effect_measure: str = _REPORT_EFFECT_MEASURE_OPTION,
 ) -> None:
     """Generate a Markdown report, figures, and Excel results workbook from CSV."""
-    result = generate_report(data, output, config=AnalysisConfig())
+    result = generate_report(
+        data,
+        output,
+        config=AnalysisConfig(effect_measure=effect_measure),  # type: ignore[arg-type]
+    )
     typer.echo(f"Report written to {result.markdown_path}")
     typer.echo(f"Excel workbook written to {result.excel_path}")

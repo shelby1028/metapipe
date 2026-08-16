@@ -41,3 +41,6 @@ Thumbs.db
 # Local environment files
 .env
 .env.*
+
+# Documentation build output
+site/

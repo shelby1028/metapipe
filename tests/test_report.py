@@ -88,3 +88,59 @@ def test_report_validates_input_and_output_configuration(tmp_path: Path) -> None
         )
     with pytest.raises(ValueError, match="Input data must be a CSV"):
         generate_report(tmp_path / "data.txt", tmp_path / "report.md")
+
+
+BINARY_SAMPLE_DATA = PROJECT_ROOT / "examples" / "sample_data_binary.csv"
+
+
+@pytest.mark.parametrize(
+    ("effect_measure", "effect_label"),
+    [
+        ("odds_ratio", "log(OR)"),
+        ("risk_ratio", "log(RR)"),
+        ("risk_difference", "Risk difference"),
+    ],
+)
+def test_report_supports_binary_or_rr_and_rd(
+    tmp_path: Path,
+    effect_measure: str,
+    effect_label: str,
+) -> None:
+    output = tmp_path / f"{effect_measure}_report.md"
+    result = generate_report(
+        BINARY_SAMPLE_DATA,
+        output,
+        config=AnalysisConfig(
+            effect_measure=effect_measure,  # type: ignore[arg-type]
+            include_sensitivity=False,
+        ),
+    )
+
+    assert output.exists()
+    assert result.excel_path.exists()
+    assert all(path.exists() for path in result.asset_paths.values())
+    assert effect_label in output.read_text(encoding="utf-8")
+    study_effects = pd.read_excel(result.excel_path, sheet_name="Study effects")
+    assert len(study_effects) == 10
+    assert study_effects["effect"].notna().all()
+
+
+def test_report_command_supports_binary_effect_measure(tmp_path: Path) -> None:
+    runner = CliRunner()
+    output = tmp_path / "binary_cli_report.md"
+
+    command_result = runner.invoke(
+        app,
+        [
+            "report",
+            str(BINARY_SAMPLE_DATA),
+            "--effect-measure",
+            "odds_ratio",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert command_result.exit_code == 0, command_result.output
+    assert output.exists()
+    assert "log(OR)" in output.read_text(encoding="utf-8")

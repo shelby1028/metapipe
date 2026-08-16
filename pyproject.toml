@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "metapipe"
 version = "0.1.0"
-description = "A no-code meta-analysis pipeline toolkit for Python."
+description = "A no-code, end-to-end meta-analysis pipeline toolkit for Python."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-  { name = "metapipe contributors" },
+  { name = "Liu Xin", email = "shelby1028@163.com" },
 ]
-keywords = ["meta-analysis", "evidence-synthesis", "statistics", "research"]
+keywords = ["meta-analysis", "statistics", "research", "systematic-review"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
@@ -24,6 +24,8 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
   "pandas>=2.0",
@@ -43,14 +45,19 @@ dev = [
   "ruff>=0.5",
   "black>=24.0",
 ]
+docs = [
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.25",
+]
 
 [project.scripts]
 metapipe = "metapipe.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/your-username/metapipe"
-Repository = "https://github.com/your-username/metapipe"
-Issues = "https://github.com/your-username/metapipe/issues"
+Homepage = "https://github.com/shelby1028/metapipe"
+Repository = "https://github.com/shelby1028/metapipe"
+Documentation = "https://liuxin.github.io/metapipe/"
+"Bug Tracker" = "https://github.com/shelby1028/metapipe/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/metapipe"]
