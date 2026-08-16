@@ -1,0 +1,83 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "metapipe"
+version = "0.1.0"
+description = "A no-code meta-analysis pipeline toolkit for Python."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "metapipe contributors" },
+]
+keywords = ["meta-analysis", "evidence-synthesis", "statistics", "research"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "pandas>=2.0",
+  "numpy>=1.23",
+  "scipy>=1.10",
+  "statsmodels>=0.14",
+  "matplotlib>=3.7",
+  "seaborn>=0.12",
+  "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.5",
+  "black>=24.0",
+]
+
+[project.scripts]
+metapipe = "metapipe.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/your-username/metapipe"
+Repository = "https://github.com/your-username/metapipe"
+Issues = "https://github.com/your-username/metapipe/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/metapipe"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=metapipe --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+branch = true
+source = ["metapipe"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
