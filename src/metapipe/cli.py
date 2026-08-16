@@ -11,6 +11,7 @@ from metapipe import __version__
 from metapipe.effects import EffectSize, hedges_g
 from metapipe.models import random_effects
 from metapipe.plots import forest_plot, funnel_plot
+from metapipe.report import AnalysisConfig, generate_report
 
 app = typer.Typer(
     add_completion=False,
@@ -45,6 +46,12 @@ _FUNNEL_OUTPUT_OPTION = typer.Option(
     "--output",
     "-o",
     help="PNG, SVG, or PDF path for the funnel plot.",
+)
+_REPORT_OUTPUT_OPTION = typer.Option(
+    Path("report.md"),
+    "--output",
+    "-o",
+    help="Markdown destination for the generated report.",
 )
 
 
@@ -123,3 +130,14 @@ def funnel(
     )
     figure.clear()
     typer.echo(f"Funnel plot written to {output}")
+
+
+@app.command()
+def report(
+    data: Path = _DATA_ARGUMENT,
+    output: Path = _REPORT_OUTPUT_OPTION,
+) -> None:
+    """Generate a Markdown report, figures, and Excel results workbook from CSV."""
+    result = generate_report(data, output, config=AnalysisConfig())
+    typer.echo(f"Report written to {result.markdown_path}")
+    typer.echo(f"Excel workbook written to {result.excel_path}")
